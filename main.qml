@@ -1,3 +1,4 @@
+import QtQml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -16,9 +17,13 @@ ApplicationWindow {
         image.source = Qt.binding(function() { return "image://wifi_qr/" + ssid + "/" + pw; } )
     }
 
-    Component.onDestruction: {
-        image.sourceSize.width = 1
-        image.sourceSize.height = 1
+    Connections {
+        target: Qt.application
+
+        function onAboutToQuit() {
+            image.sourceSize.width = 1;
+            image.sourceSize.height = 1;
+        }
     }
 
     title: qsTr("WiFi QR Code Generator")
@@ -51,8 +56,6 @@ ApplicationWindow {
             fillMode: Image.PreserveAspectFit
             sourceSize.width: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
             sourceSize.height: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
-            onSourceSizeChanged: console.log("sourceSize: " + sourceSize)
-            onBounded_smallest_dimensionChanged: console.log("bounded_smallest_dimension: " + bounded_smallest_dimension)
             anchors {
                 top: parent.top
                 left: parent.left
