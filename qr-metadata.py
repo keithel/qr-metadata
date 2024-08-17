@@ -12,19 +12,21 @@ from PySide6.QtQuick import QQuickImageProvider
 QML_IMPORT_NAME = "io.qt.dev"
 QML_IMPORT_MAJOR_VERSION = 1
 
+QR_DATA_FORMAT_STR = "WIFI:T:WPA;S:{};P:{};;"
+
 def get_module_counts(qr: qrcode.QRCode) -> tuple[int, int]:
     qr.get_matrix()
-    true_modules = reduce(lambda x,y: x + sum(y), qr.modules, 0)
-    false_modules = reduce(lambda x,y: x + len(y), qr.modules, 0) - true_modules
-    return (true_modules, false_modules)
+    on_modules = reduce(lambda x,y: x + sum(y), qr.modules, 0)
+    off_modules = reduce(lambda x,y: x + len(y), qr.modules, 0) - on_modules
+    return (on_modules, off_modules)
 
 def get_row_module_counts(qr: qrcode.QRCode) -> list[tuple[int,int]]:
     qr.get_matrix()
     ret = []
     for row in qr.modules:
-        true_modules = reduce(lambda x,y: x+y, row, 0)
-        false_modules = len(row)-true_modules
-        ret.append((true_modules, false_modules))
+        on_modules = reduce(lambda x,y: x+y, row, 0)
+        off_modules = len(row)-on_modules
+        ret.append((on_modules, off_modules))
     return ret
 
 class WiFiQRCodeImageProvider(QQuickImageProvider):
@@ -73,7 +75,7 @@ class WiFiQRCodeImageProvider(QQuickImageProvider):
 
         ssid_pw = id.split("/", maxsplit=1)
         qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
-        qr.add_data(f"WIFI:T:WPA;S:{ssid_pw[0]};P:{ssid_pw[1]};;")
+        qr.add_data(QR_DATA_FORMAT_STR.format(*ssid_pw))
         qr.get_matrix()
         image = self.createImage(qr, width, height)
         return image
@@ -84,19 +86,31 @@ class QRCodeInfo(QObject):
     ssid_changed = Signal(str)
     ssid_pw_changed = Signal(str)
     size_changed = Signal(int)
+    on_modules_changed = Signal(int)
+    off_modules_changed = Signal(int)
 
     def __init__(self):
         super().__init__()
         self._ssid: str = ""
         self._ssid_pw: str = ""
         self._size: int = 0
+        self._on_modules = 0
+        self._off_modules = 0
 
     def updateQR(self) -> None:
         qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
-        qr.add_data(f"WIFI:T:WPA;S:{self._ssid};P:{self._ssid_pw};;")
+        qr.add_data(QR_DATA_FORMAT_STR.format(self._ssid, self._ssid_pw))
         qr.get_matrix()
         self._size = len(qr.modules)
+        on_modules, off_modules = get_module_counts(qr)
         self.size_changed.emit(self._size)
+        self.on_modules_changed.emit(self._on_modules)
+        if on_modules != self._on_modules:
+            self._on_modules = on_modules
+            self.on_modules_changed.emit(self._on_modules)
+        if off_modules != self._off_modules:
+            self._off_modules = off_modules
+            self.off_modules_changed.emit(self._off_modules)
 
     def get_ssid(self) -> str:
         return self._ssid
@@ -106,6 +120,12 @@ class QRCodeInfo(QObject):
 
     def get_size(self) -> int:
         return self._size
+
+    def get_on_modules(self) -> int:
+        return self._on_modules
+
+    def get_off_modules(self) -> int:
+        return self._off_modules
 
     def set_ssid(self, ssid: str) -> None:
         self._ssid = ssid
@@ -120,13 +140,11 @@ class QRCodeInfo(QObject):
     ssid = Property(str, get_ssid, set_ssid, notify=ssid_changed)
     ssid_pw = Property(str, get_ssid_pw, set_ssid_pw, notify=ssid_pw_changed)
     size = Property(int, get_size, notify=size_changed)
+    on_modules = Property(int, get_on_modules, notify=on_modules_changed)
+    off_modules = Property(int, get_off_modules, notify=off_modules_changed)
 
 
 if __name__ == "__main__":
-    #ssid = "MyAP"
-    #password = "MyPassword"
-    #qr_text = f"WIFI:T:WPA;S:{ssid};P:{password};;"
-
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
     engine.addImageProvider("wifi_qr", WiFiQRCodeImageProvider())

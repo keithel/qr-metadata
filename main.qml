@@ -23,6 +23,9 @@ ApplicationWindow {
         function onAboutToQuit() {
             image.sourceSize.width = 1;
             image.sourceSize.height = 1;
+            sizeText.text = ""
+            onPipsText.text = ""
+            offPipsText.text = ""
         }
     }
 
@@ -38,7 +41,6 @@ ApplicationWindow {
         id: qrCodeInfo
         ssid: window.ssid
         ssid_pw: window.pw
-        onSizeChanged: console.log("qrCodeInfo.size: " + size)
     }
 
     header: ToolBar {
@@ -81,6 +83,8 @@ ApplicationWindow {
                 }
                 TextField {
                     id: ssidField
+                    // Layout.fillWidth: true
+                    Layout.preferredWidth: Math.max(implicitWidth, contentWidth)
                     // font.pixelSize: textFontPixelSize
                     text: "MyAP"
                 }
@@ -90,17 +94,47 @@ ApplicationWindow {
                 }
                 TextField {
                     id: pwField
-                    // font.pixelSize: textFontPixelSize
+                    Layout.fillWidth: true
+                // font.pixelSize: textFontPixelSize
                     text: "MyPassword"
                 }
             }
 
-            Button {
-                id: quitButton
-                KeyNavigation.tab: image
-                text: "Quit"
-                // font.pixelSize: buttonFontPixelSize
-                onClicked: quitAnim.start()
+            RowLayout {
+                Label {
+                    text: "Size"
+                }
+                TextField {
+                    id: sizeText
+                    readOnly: true
+                    text: qrCodeInfo.size
+                }
+                Label {
+                    text: "Black Pips"
+                }
+                TextField {
+                    id: onPipsText
+                    readOnly: true
+                    text: qrCodeInfo.on_modules
+                }
+                Label {
+                    text: "White Pips"
+                }
+                TextField {
+                    id: offPipsText
+                    readOnly: true
+                    text: qrCodeInfo.off_modules
+                }
+                Item {
+                    Layout.fillWidth: true
+                }
+                Button {
+                    id: quitButton
+                    KeyNavigation.tab: image
+                    text: "Quit"
+                    // font.pixelSize: buttonFontPixelSize
+                    onClicked: quitAnim.start()
+                }
             }
         }
     }
