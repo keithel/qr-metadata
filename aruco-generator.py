@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
-from aruco_tool import ArUcoImageProvider, MarkerInfo
+from aruco_tool import ArUcoImageProvider, MarkerInfo, ArUcoDetector
 
 
 if __name__ == "__main__":
