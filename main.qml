@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import io.qt.dev
 
 ApplicationWindow {
@@ -29,6 +30,8 @@ ApplicationWindow {
             borderSizeText.text = ""
             onPipsText.text = ""
             offPipsText.text = ""
+            detectionResultLabel.text = ""
+            detectionRepeater.model = []
         }
     }
 
@@ -78,11 +81,43 @@ ApplicationWindow {
                         color: "white"
                         Image {
                             id: image
+
                             anchors.fill: parent
                             anchors.margins: 10
                             fillMode: Image.PreserveAspectFit
                             smooth: false
 
+                            property real rotationAngle: 0
+                            property real xScaleFactor: 1
+                            property real yScaleFactor: 1
+                            property bool randomizedTransform: randomizedTransformCheckbox.checked
+                            onRandomizedTransformChanged: {
+                                if (randomizedTransform) {
+                                    randomizeTransform()
+                                } else {
+                                    rotationAngle = 0
+                                    xScaleFactor = 1
+                                    yScaleFactor = 1
+                                }
+                            }
+                            function randomizeTransform() {
+                                rotationAngle = Math.random() * 360
+                                xScaleFactor = Math.random() * 2
+                                yScaleFactor = Math.random() * 2
+                            }
+                            transform: [
+                                Rotation {
+                                    angle: image.rotationAngle
+                                    origin.x: image.width / 2
+                                    origin.y: image.height / 2
+                                },
+                                Scale {
+                                    xScale: image.xScaleFactor
+                                    yScale: image.yScaleFactor
+                                    origin.x: image.width / 2
+                                    origin.y: image.height / 2
+                                }
+                            ]
                             // property int smallest_dimension: Math.min(width, height)
                             // property int bounded_smallest_dimension: smallest_dimension <= 1024 ? smallest_dimension : 1024
                             // sourceSize.width: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
@@ -95,7 +130,6 @@ ApplicationWindow {
                         Layout.maximumHeight: implicitHeight
                         direction: FlexboxLayout.Row
                         wrap: FlexboxLayout.Wrap
-                        justifyContent: FlexboxLayout.JustifyStart
                         property int textFieldPreferredWidth: 50
 
                         RowLayout {
@@ -167,6 +201,11 @@ ApplicationWindow {
                                 value: 10
                             }
                         }
+                        CheckBox {
+                            id: randomizedTransformCheckbox
+                            text: "Apply Random Transformation"
+                            checked: false
+                        }
 
                         Button {
                             id: quitButton
@@ -179,9 +218,90 @@ ApplicationWindow {
             }
 
             Item {
-                Label {
-                    anchors.centerIn: parent
-                    text: "Detector not implemented yet."
+                id: detectorTab
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 10
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.minimumHeight: 50
+                        color: "white"
+                        border.color: "#84f"
+
+                        Image {
+                            id: previewImage
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            fillMode: Image.PreserveAspectFit
+                            smooth: false
+                            autoTransform: true
+                        }
+
+                        Label {
+                            anchors.centerIn: parent
+                            text: "No Image Loaded"
+                            visible: previewImage.status !== Image.Ready
+                            color: "gray"
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Button {
+                            text: "Load Image"
+                            onClicked: fileDialog.open()
+                        }
+
+                        Label {
+                            id: detectionResultLabel
+                            text: detector.detections.length + " markers detected."
+                            visible: previewImage.status === Image.Ready
+                        }
+                    }
+
+                    ScrollView {
+                        Layout.fillWidth: true
+                        // Layout.fillHeight: true
+                        contentWidth: availableWidth
+
+                        ColumnLayout {
+                            id: detectionResultsLayout
+                            width: parent.width
+                            spacing: 5
+
+                            Repeater {
+                                id: detectionRepeater
+                                model: detector.detections
+                                delegate: RowLayout {
+                                    width: parent.width
+                                    TextField {
+                                        text: modelData.id
+                                        readOnly: true
+                                        Layout.preferredWidth: 50
+                                        horizontalAlignment: Qt.AlignHCenter
+                                    }
+                                    TextField {
+                                        text: modelData.position
+                                        readOnly: true
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                FileDialog {
+                    id: fileDialog
+                    title: "Select an Image"
+                    nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp)"]
+                    onAccepted: {
+                        previewImage.source = selectedFile
+                        detector.detectFromFile(selectedFile)
+                    }
                 }
             }
         }
