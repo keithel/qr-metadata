@@ -44,71 +44,108 @@ ApplicationWindow {
     ColumnLayout {
         id: windowContent
         anchors.fill: parent
-        anchors.margins: 20
+        anchors.margins: 10
 
-        Image {
-            id: image
+        Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            fillMode: Image.PreserveAspectFit
-            smooth: false
+            Layout.minimumHeight: image.sourceSize.height
+            Layout.minimumWidth: image.sourceSize.width
+            onWidthChanged: console.log("imagerect WxH: " + width + "x" + height)
+            onHeightChanged: console.log("imagerect WxH: " + width + "x" + height)
+            color: "white"
+            Image {
+                id: image
+                anchors.fill: parent
+                anchors.margins: 10
+                fillMode: Image.PreserveAspectFit
+                smooth: false
 
-            // property int smallest_dimension: Math.min(width, height)
-            // property int bounded_smallest_dimension: smallest_dimension <= 1024 ? smallest_dimension : 1024
-            // sourceSize.width: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
-            // sourceSize.height: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
-        }
-
-        RowLayout {
-            Layout.alignment: Qt.AlignHCenter
-            Label {
-                text: "Marker ID (0-49):"
-            }
-            SpinBox {
-                id: markerSpinbox
-                from: 0
-                to: 49
-                value: 10
+                // property int smallest_dimension: Math.min(width, height)
+                // property int bounded_smallest_dimension: smallest_dimension <= 1024 ? smallest_dimension : 1024
+                // sourceSize.width: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
+                // sourceSize.height: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
             }
         }
 
-        RowLayout {
-            Layout.alignment: Qt.AlignHCenter
-            Label {
-                text: "Marker Size"
+        FlexboxLayout {
+            id: metadataLayout
+            Layout.maximumHeight: implicitHeight
+            direction: FlexboxLayout.Row
+            wrap: FlexboxLayout.Wrap
+            justifyContent: FlexboxLayout.JustifyStart
+            property int textFieldPreferredWidth: 50
+
+            RowLayout {
+                Label {
+                    id: markerSizeLabel
+                    text: "Marker Size"
+                }
+                TextField {
+                    id: markerSizeText
+                    Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
+                    width: parent.textFieldPreferredWidth
+                    horizontalAlignment: Qt.AlignHCenter
+                    readOnly: true
+                    text: markerInfo.marker_size
+                }
             }
-            TextField {
-                id: markerSizeText
-                readOnly: true
-                text: markerInfo.marker_size
+            RowLayout {
+                Label {
+                    verticalAlignment: Qt.AlignVCenter
+                    text: "Border Size"
+                }
+                TextField {
+                    id: borderSizeText
+                    Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
+                    horizontalAlignment: Qt.AlignHCenter
+                    readOnly: true
+                    text: markerInfo.border_size
+                }
             }
-            Label {
-                text: "Border Size"
+            RowLayout {
+                Label {
+                    verticalAlignment: Qt.AlignVCenter
+                    text: "Black Pips"
+                }
+                TextField {
+                    id: onPipsText
+                    Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
+                    horizontalAlignment: Qt.AlignHCenter
+                    readOnly: true
+                    text: markerInfo.on_modules
+                }
             }
-            TextField {
-                id: borderSizeText
-                readOnly: true
-                text: markerInfo.border_size
-            }
-            Label {
-                text: "Black Pips"
-            }
-            TextField {
-                id: onPipsText
-                readOnly: true
-                text: markerInfo.on_modules
-            }
-            Label {
-                text: "White Pips"
-            }
-            TextField {
-                id: offPipsText
-                readOnly: true
-                text: markerInfo.off_modules
+            RowLayout {
+                Label {
+                    verticalAlignment: Qt.AlignVCenter
+                    text: "White Pips"
+                }
+                TextField {
+                    id: offPipsText
+                    Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
+                    horizontalAlignment: Qt.AlignHCenter
+                    readOnly: true
+                    text: markerInfo.off_modules
+                }
             }
             Item {
                 Layout.fillWidth: true
             }
+            RowLayout {
+                Label {
+                    verticalAlignment: Qt.AlignVCenter
+                    text: "Marker ID (0-49):"
+                }
+                SpinBox {
+                    id: markerSpinbox
+                    Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
+                    from: 0
+                    to: 49
+                    value: 10
+                }
+            }
+
             Button {
                 id: quitButton
                 KeyNavigation.tab: image
