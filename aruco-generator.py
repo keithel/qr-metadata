@@ -11,7 +11,7 @@ if __name__ == "__main__":
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
 
-    engine.addImageProvider("aruco", ArUcoImageProvider())
+    engine.addImageProvider("aruco", ArUcoImageProvider.instance())
     engine.load(os.fspath(Path(__file__).resolve().parent / "main.qml"))
 
     if not engine.rootObjects():

@@ -7,8 +7,16 @@ from PySide6.QtQuick import QQuickImageProvider
 from .utils import ARUCO_DICT, BORDER_SIZE
 
 class ArUcoImageProvider(QQuickImageProvider):
+    _instance = None
+
     def __init__(self):
         super().__init__(QQmlImageProviderBase.ImageType.Image)
+
+    @classmethod
+    def instance(cls):
+        if ArUcoImageProvider._instance is None:
+            ArUcoImageProvider._instance = ArUcoImageProvider()
+        return ArUcoImageProvider._instance
 
     def createImage(self, marker_matrix: np.ndarray, width: int, height: int) -> QImage:
         rows, cols = marker_matrix.shape
