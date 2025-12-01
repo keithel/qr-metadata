@@ -40,6 +40,10 @@ ApplicationWindow {
         marker_id: window.currentMarkerId
     }
 
+    HomographyTools {
+        id: homgraphyTools
+    }
+
     ArUcoDetector {
         id: detector
     }
@@ -217,7 +221,7 @@ ApplicationWindow {
                                     markerSpinbox.value % 50 + 2,
                                     markerSpinbox.value % 50 + 3
                                 ]
-                                markerInfo.generate_pdf(markers, "template.pdf")
+                                homgraphyTools.generate_pdf(markers, "template.pdf")
                                 console.log("Generated PDF for marker ID " + markerSpinbox.value + " to " + (markerSpinbox.value + 3) );
                             }
                         }
