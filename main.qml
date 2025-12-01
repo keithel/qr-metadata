@@ -208,6 +208,21 @@ ApplicationWindow {
                         }
 
                         Button {
+                            id: generatePdfButton
+                            text: "Generate PDF"
+                            onClicked: {
+                                var markers = [
+                                    markerSpinbox.value % 50,
+                                    markerSpinbox.value % 50 + 1,
+                                    markerSpinbox.value % 50 + 2,
+                                    markerSpinbox.value % 50 + 3
+                                ]
+                                markerInfo.generate_pdf(markers, "template.pdf")
+                                console.log("Generated PDF for marker ID " + markerSpinbox.value + " to " + (markerSpinbox.value + 3) );
+                            }
+                        }
+
+                        Button {
                             id: quitButton
                             KeyNavigation.tab: image
                             text: "Quit"
