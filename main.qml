@@ -32,6 +32,7 @@ ApplicationWindow {
             offPipsText.text = ""
             detectionResultLabel.text = ""
             detectionRepeater.model = []
+            markerIdLabelsRepeater.model = []
         }
     }
 
@@ -40,12 +41,8 @@ ApplicationWindow {
         marker_id: window.currentMarkerId
     }
 
-    HomographyTools {
-        id: homgraphyTools
-    }
-
-    ArUcoDetector {
-        id: detector
+    ArUcoHomography {
+        id: homographyTools
     }
 
     header: ToolBar {
@@ -221,7 +218,7 @@ ApplicationWindow {
                                     markerSpinbox.value % 50 + 2,
                                     markerSpinbox.value % 50 + 3
                                 ]
-                                homgraphyTools.generate_pdf(markers, "template.pdf")
+                                homographyTools.generate_pdf(markers, "template.pdf")
                                 console.log("Generated PDF for marker ID " + markerSpinbox.value + " to " + (markerSpinbox.value + 3) );
                             }
                         }
@@ -248,15 +245,45 @@ ApplicationWindow {
                         Layout.fillHeight: true
                         Layout.minimumHeight: 50
                         color: "white"
-                        border.color: "#84f"
 
                         Image {
                             id: previewImage
+                            property bool showMarkerLabels: true
+                            property real scaleFactor: {
+                                previewImage.status === Image.Ready ?
+                                    Math.min(previewImage.width / previewImage.sourceSize.width,
+                                             previewImage.height / previewImage.sourceSize.height)
+                                    : 0
+                            }
+                            property int xOffset: previewImage.x + (previewImage.width - previewImage.sourceSize.width * previewImage.scaleFactor) / 2
+                            property int yOffset: previewImage.y + (previewImage.height - previewImage.sourceSize.height * previewImage.scaleFactor) / 2
+
+                            source: ""
                             anchors.fill: parent
                             anchors.margins: 2
                             fillMode: Image.PreserveAspectFit
                             smooth: false
                             autoTransform: true
+
+                            Repeater {
+                                id: markerIdLabelsRepeater
+                                model: homographyTools.detections
+                                delegate: TextField {
+                                    visible: previewImage.showMarkerLabels
+                                    text: modelData.id
+                                    width: 30
+                                    x: previewImage.xOffset + Math.min(modelData.tl[0], modelData.tr[0], modelData.br[0], modelData.bl[0]) * previewImage.scaleFactor + 4
+                                    y: previewImage.yOffset + Math.min(modelData.tl[1], modelData.tr[1], modelData.br[1], modelData.bl[1]) * previewImage.scaleFactor - 20
+                                    readOnly: true
+                                    Layout.preferredWidth: 50
+                                    horizontalAlignment: Qt.AlignHCenter
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onPressed: parent.showMarkerLabels = false
+                                onReleased: parent.showMarkerLabels = true
+                            }
                         }
 
                         Label {
@@ -276,7 +303,7 @@ ApplicationWindow {
 
                         Label {
                             id: detectionResultLabel
-                            text: detector.detections.length + " markers detected."
+                            text: homographyTools.detections.length + " markers detected."
                             visible: previewImage.status === Image.Ready
                         }
                     }
@@ -293,7 +320,7 @@ ApplicationWindow {
 
                             Repeater {
                                 id: detectionRepeater
-                                model: detector.detections
+                                model: homographyTools.detections
                                 delegate: RowLayout {
                                     width: parent.width
                                     TextField {
@@ -303,7 +330,8 @@ ApplicationWindow {
                                         horizontalAlignment: Qt.AlignHCenter
                                     }
                                     TextField {
-                                        text: modelData.position
+                                        text: ("TL: " + modelData.tl +
+                                              " BR: " + modelData.br)
                                         readOnly: true
                                         Layout.fillWidth: true
                                     }
@@ -319,7 +347,7 @@ ApplicationWindow {
                     nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp)"]
                     onAccepted: {
                         previewImage.source = selectedFile
-                        detector.detectFromFile(selectedFile)
+                        homographyTools.detectFromFile(selectedFile)
                     }
                 }
             }
