@@ -1,4 +1,4 @@
-import cv2
+from typing import Optional
 import numpy as np
 from PySide6.QtCore import Qt, QRect
 from PySide6.QtGui import QImage, QPainter, QBrush
@@ -18,13 +18,7 @@ class ArUcoImageProvider(QQuickImageProvider):
             ArUcoImageProvider._instance = ArUcoImageProvider()
         return ArUcoImageProvider._instance
 
-    def createImage(self, marker_matrix: np.ndarray, width: int, height: int) -> QImage:
-        rows, cols = marker_matrix.shape
-        square_size = min(width, height) // rows
-
-        offset_x = (width - cols * square_size) // 2
-        offset_y = (height - rows * square_size) // 2
-
+    def createImage(self, marker_matrix: Optional[np.ndarray], width: int, height: int) -> QImage:
         img = QImage(width, height, QImage.Format.Format_Mono)
         img.setColorCount(2)
         img.setColor(0, 0xFF000000)
@@ -33,6 +27,16 @@ class ArUcoImageProvider(QQuickImageProvider):
             return img
 
         img.fill(img.color(1))
+
+        if marker_matrix is None:
+            return img
+
+        rows, cols = marker_matrix.shape
+        square_size = min(width, height) // rows
+
+        offset_x = (width - cols * square_size) // 2
+        offset_y = (height - rows * square_size) // 2
+
         painter = QPainter(img)
 
         # Just fill - no pen
@@ -67,8 +71,10 @@ class ArUcoImageProvider(QQuickImageProvider):
 
         try:
             marker_id = int(id)
+            if marker_id < 0 or marker_id >= 50:
+                raise ValueError("ID out of range")
         except ValueError:
-            marker_id = 0
+            return self.createImage(None, width, height)
 
         print(f"requestImage({id}, {size}, {requestedSize})")
         marker_matrix = ARUCO_DICT.generateImageMarker(marker_id, side_bits)
