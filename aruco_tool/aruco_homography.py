@@ -10,37 +10,48 @@ from .image_provider import ArUcoImageProvider
 QML_IMPORT_NAME = "io.qt.dev"
 QML_IMPORT_MAJOR_VERSION = 1
 
+# Predefined templates for marker placement
+# Each template defines the page size, marker IDs to use, and margin in mm
+# The markerIDs are in the order: Top-Left, Top-Right, Bottom-Left, Bottom-Right
+# Note: This is *not* how OpenCV orders points in detected ArUco markers.
+TEMPLATES = {
+    "Letter": {
+        "ids": [0, 1, 2, 3],
+        "pageSizeId": QPageSize.PageSizeId.Letter,
+        "margin_mm": 10,
+        "marker_image_mm_size": 14
+    },
+    "Postcard": {
+        "ids": [4, 5, 6, 7],
+        "pageSizeId": QPageSize.PageSizeId.Postcard,
+        "margin_mm": 5,
+        "marker_image_mm_size": 10
+    }
+}
+
 @QmlElement
 class ArUcoHomography(QObject):
     detectionsChanged = Signal()
+    templateChanged = Signal(str)
 
     def __init__(self):
         super().__init__()
         self._detections = []
+        # Default template is the first one in the TEMPLATES dict
+        current_template_name = TEMPLATES.keys().__iter__().__next__()
 
-        marker_image_mm_size = 14  # Size of marker in mm when printed
+        # Intilize geometry with default template
         self._dpi = 300  # Dots per inch for PDF generation
-        self._marker_image_dot_size = self._mm_to_dots(marker_image_mm_size)
+        self._set_template(current_template_name, emit_signal=False)
 
-        self._page_size = QPageSize(QPageSize.PageSizeId.Letter)
-        ps = self._page_size.sizePixels(self._dpi)
-        # Positon the markers at the corners of the page
-        marker_margin = 42 # Place markers right at the edge of the standard Letter page margin
-        self._template_marker_positions = [
-            (marker_margin, marker_margin),
-            (ps.width() - marker_margin - self._marker_image_dot_size, marker_margin),
-            (marker_margin, ps.height() - marker_margin - self._marker_image_dot_size),
-            (ps.width() - marker_margin - self._marker_image_dot_size,
-             ps.height() - marker_margin - self._marker_image_dot_size)
-        ]
-
-    # Using QVariantList to pass list of dicts to QML
-    @Property('QVariantList', notify=detectionsChanged)
-    def detections(self):
-        return self._detections
+    @Slot(str, result=int)
+    def getPreviewMarkerId(self, template_name: str) -> int:
+        if template_name in TEMPLATES:
+            return TEMPLATES[template_name]["ids"][0]
+        return 0
 
     @Slot(str)
-    def detectFromFile(self, file_url_str):
+    def detectFromFile(self, file_url_str: str):
         # Handle QML file URL (file:///...)
         file_path = QUrl(file_url_str).toLocalFile()
 
@@ -60,28 +71,77 @@ class ArUcoHomography(QObject):
 
         corners, ids, rejected = detector.detectMarkers(gray)
 
+        if ids is None:
+            if len(self._detections) > 0:
+                self._detections = []
+                self.detectionsChanged.emit()
+            return
+
+        flat_ids = ids.flatten()
+
+        found_template = None
+        valid_corners = {} # Map ID -> Corner Data
+
+        for name, conf in TEMPLATES.items():
+            required_ids = conf["ids"]
+            if set(required_ids).issubset(set(flat_ids)):
+                found_template = name
+                break
+
         new_detections = []
 
-        if ids is not None:
-            ids = ids.flatten()
-            for i, marker_id in enumerate(ids):
-                # corners[i] shape is (1, 4, 2)
-                c = corners[i][0]
+        if found_template:
+            print(f"Found template: {found_template}")
+            self._set_template(found_template)
 
-                # Format simple string for display: TL(x,y)
-                pos_str = f"TL({int(c[0][0])},{int(c[0][1])}) BR({int(c[2][0])},{int(c[2][1])})"
+            for i, marker_id in enumerate(flat_ids):
+                valid_corners[marker_id] = corners[i][0]
+
+            required_ids = TEMPLATES[found_template]["ids"]
+
+            for role_idx, marker_id in enumerate(required_ids):
+                c = valid_corners[marker_id]
+                roles = ["TL", "TR", "BL", "BR"]
+                role_name = roles[role_idx]
 
                 new_detections.append({
                     "id": int(marker_id),
+                    "role": role_name,
                     "tl": c[0].tolist(),
                     "tr": c[1].tolist(),
                     "br": c[2].tolist(),
                     "bl": c[3].tolist(),
-                    "positionStr": pos_str
+                    "positionStr": f"{role_name}: ({int(c[0][0])},{int(c[0][1])})"
+                })
+        else:
+            print("Validation Failed: No matching template found.")
+            self._current_template_name = ""
+            self.templateChanged.emit("")
+
+            # Fallback: report all detected markers without roles
+            for i, marker_id in enumerate(flat_ids):
+                c = corners[i][0]
+                new_detections.append({
+                    "id": int(marker_id),
+                    "role": "N/A",
+                    "tl": c[0].tolist(),
+                    "tr": c[1].tolist(),
+                    "br": c[2].tolist(),
+                    "bl": c[3].tolist(),
+                    "positionStr": f"({int(c[0][0])},{int(c[0][1])})"
                 })
 
-        self._detections = new_detections
-        self.detectionsChanged.emit()
+        if new_detections != self._detections:
+            self._detections = new_detections
+            self.detectionsChanged.emit()
+
+    @Slot(str, str)
+    def generate_template_pdf(self, template_name: str, filename: str) -> None:
+        if template_name not in TEMPLATES:
+            print(f"Unknown template: {template_name}")
+            return
+        self._set_template(template_name)
+        self.generate_pdf(TEMPLATES[template_name]["ids"], filename)
 
     @Slot(list, str)
     def generate_pdf(self, marker_ids: list[int], filename: str) -> None:
@@ -98,6 +158,39 @@ class ArUcoHomography(QObject):
             painter.drawImage(pos[0], pos[1], img)
         painter.end()
 
+    def _set_template(self, template_name: str, emit_signal: bool = True) -> None:
+        if template_name not in TEMPLATES:
+            print(f"Unknown template: {template_name}")
+            return
+
+        if hasattr(self, "_current_template_name") and template_name == self._current_template_name:
+            print(f"Template {template_name} is already set.")
+            return
+
+        self._current_template_name = template_name
+
+        conf = TEMPLATES[template_name]
+        self._page_size = QPageSize(conf["pageSizeId"])
+        ps_pixels = self._page_size.sizePixels(self._dpi)
+        margin_pixels = self._mm_to_dots(conf["margin_mm"])
+
+        self._marker_image_dot_size = self._mm_to_dots(conf["marker_image_mm_size"])
+
+        w = ps_pixels.width()
+        h = ps_pixels.height()
+        marker_dotsize = self._marker_image_dot_size
+        m = margin_pixels
+
+        self._template_marker_positions = [
+            (m, m),
+            (w - m - marker_dotsize, m),
+            (m, h - m - marker_dotsize),
+            (w - m - marker_dotsize, h - m - marker_dotsize)
+        ]
+
+        if emit_signal:
+            self.templateChanged.emit(template_name)
+
     def _setup_pdf_writer(self, filename: str) -> QPdfWriter:
         pdf_writer = QPdfWriter(filename)
         pdf_writer.setPageSize(self._page_size)
@@ -107,3 +200,16 @@ class ArUcoHomography(QObject):
 
     def _mm_to_dots(self, mm: float) -> int:
         return int(mm * self._dpi / 25.4)
+
+    # Using QVariantList to pass list of dicts to QML
+    @Property('QVariantList', notify=detectionsChanged)
+    def detections(self):
+        return self._detections
+
+    @Property(list, constant=True)
+    def availableTemplates(self):
+        return list(TEMPLATES.keys())
+
+    @Property(str, notify=templateChanged)
+    def template(self) -> str:
+        return self._current_template_name

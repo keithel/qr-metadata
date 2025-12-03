@@ -11,12 +11,22 @@ ApplicationWindow {
     height: 768
     title: qsTr("ArUco Manager")
 
-    property int currentMarkerId: markerSpinbox.value
+    property int currentMarkerId: 0
+
+    MarkerInfo {
+        id: markerInfo
+        marker_id: window.currentMarkerId
+    }
+
+    ArUcoHomography {
+        id: homographyTools
+    }
 
     onClosing: function (close) {
     }
 
     Component.onCompleted: {
+        currentMarkerId = homographyTools.getPreviewMarkerId(homographyTools.availableTemplates[templateComboBox.currentIndex])
         image.source = Qt.binding(function() { return "image://aruco/" + currentMarkerId; })
     }
 
@@ -36,22 +46,12 @@ ApplicationWindow {
         }
     }
 
-    MarkerInfo {
-        id: markerInfo
-        marker_id: window.currentMarkerId
-    }
-
-    ArUcoHomography {
-        id: homographyTools
-    }
-
     header: ToolBar {
     }
 
     ColumnLayout {
         id: windowContent
         anchors.fill: parent
-        //anchors.margins: 10
 
         TabBar {
             id: tabBar
@@ -135,13 +135,35 @@ ApplicationWindow {
 
                         RowLayout {
                             Label {
+                                id: templateLabel
+                                text: "Template"
+                            }
+                            TextField {
+                                id: templateText
+                                Layout.preferredWidth: 70
+                                horizontalAlignment: Qt.AlignHCenter
+                                readOnly: true
+                                text: templateComboBox.currentText
+                            }
+                            Label {
+                                id: markerIdLabel
+                                text: "ID"
+                            }
+                            TextField {
+                                id: markerIdText
+                                Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
+                                horizontalAlignment: Qt.AlignHCenter
+                                readOnly: true
+                                text: markerInfo.marker_id
+                            }
+                            Label {
                                 id: markerSizeLabel
                                 text: "Marker Size"
                             }
                             TextField {
                                 id: markerSizeText
                                 Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
-                                width: parent.textFieldPreferredWidth
+                                width: metadataLayout.textFieldPreferredWidth
                                 horizontalAlignment: Qt.AlignHCenter
                                 readOnly: true
                                 text: markerInfo.marker_size
@@ -192,14 +214,16 @@ ApplicationWindow {
                         RowLayout {
                             Label {
                                 verticalAlignment: Qt.AlignVCenter
-                                text: "Marker ID (0-49):"
+                                text: "Template:"
                             }
-                            SpinBox {
-                                id: markerSpinbox
-                                Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
-                                from: 0
-                                to: 49
-                                value: 10
+                            ComboBox {
+                                id: templateComboBox
+                                model: homographyTools.availableTemplates
+                                Layout.preferredWidth: 150
+                                onCurrentIndexChanged: {
+                                    console.log("template changed: " + model[currentIndex])
+                                    window.currentMarkerId = homographyTools.getPreviewMarkerId(model[currentIndex])
+                                }
                             }
                         }
                         CheckBox {
@@ -212,14 +236,8 @@ ApplicationWindow {
                             id: generatePdfButton
                             text: "Generate PDF"
                             onClicked: {
-                                var markers = [
-                                    markerSpinbox.value % 50,
-                                    markerSpinbox.value % 50 + 1,
-                                    markerSpinbox.value % 50 + 2,
-                                    markerSpinbox.value % 50 + 3
-                                ]
-                                homographyTools.generate_pdf(markers, "template.pdf")
-                                console.log("Generated PDF for marker ID " + markerSpinbox.value + " to " + (markerSpinbox.value + 3) );
+                                homographyTools.generate_template_pdf(templateComboBox.currentText, "template.pdf")
+                                console.log("Generated PDF for template " + templateComboBox.currentText);
                             }
                         }
 
@@ -270,7 +288,8 @@ ApplicationWindow {
                                 model: homographyTools.detections
                                 delegate: TextField {
                                     visible: previewImage.showMarkerLabels
-                                    text: modelData.id
+                                    text: modelData.role == "N/A" ? modelData.id : modelData.role
+                                    color: modelData.role == "N/A" ? "red" : "green"
                                     width: 30
                                     x: previewImage.xOffset + Math.min(modelData.tl[0], modelData.tr[0], modelData.br[0], modelData.bl[0]) * previewImage.scaleFactor + 4
                                     y: previewImage.yOffset + Math.min(modelData.tl[1], modelData.tr[1], modelData.br[1], modelData.bl[1]) * previewImage.scaleFactor - 20
