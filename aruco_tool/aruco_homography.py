@@ -33,6 +33,7 @@ TEMPLATES = {
 class ArUcoHomography(QObject):
     detectionsChanged = Signal()
     templateChanged = Signal(str)
+    templateMarkerIdsChanged = Signal()
 
     def __init__(self):
         super().__init__()
@@ -43,12 +44,6 @@ class ArUcoHomography(QObject):
         # Intilize geometry with default template
         self._dpi = 300  # Dots per inch for PDF generation
         self._set_template(current_template_name, emit_signal=False)
-
-    @Slot(str, result=int)
-    def getPreviewMarkerId(self, template_name: str) -> int:
-        if template_name in TEMPLATES:
-            return TEMPLATES[template_name]["ids"][0]
-        return 0
 
     @Slot(str)
     def detectFromFile(self, file_url_str: str):
@@ -190,6 +185,7 @@ class ArUcoHomography(QObject):
 
         if emit_signal:
             self.templateChanged.emit(template_name)
+            self.templateMarkerIdsChanged.emit()
 
     def _setup_pdf_writer(self, filename: str) -> QPdfWriter:
         pdf_writer = QPdfWriter(filename)
@@ -213,3 +209,14 @@ class ArUcoHomography(QObject):
     @Property(str, notify=templateChanged)
     def template(self) -> str:
         return self._current_template_name
+
+    @template.setter
+    def template(self, new_template: str):
+        self._set_template(new_template)
+
+    @Property(list, notify=templateMarkerIdsChanged)
+    def templateMarkerIds(self) -> list[int]:
+        template_name = self._current_template_name
+        if template_name in TEMPLATES:
+            return [int(id) for id in TEMPLATES[template_name]["ids"]]
+        return []

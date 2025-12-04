@@ -11,23 +11,11 @@ ApplicationWindow {
     height: 768
     title: qsTr("ArUco Manager")
 
-    property int currentMarkerId: 0
-
-    MarkerInfo {
-        id: markerInfo
-        marker_id: window.currentMarkerId
-    }
-
     ArUcoHomography {
         id: homographyTools
     }
 
     onClosing: function (close) {
-    }
-
-    Component.onCompleted: {
-        currentMarkerId = homographyTools.getPreviewMarkerId(homographyTools.availableTemplates[templateComboBox.currentIndex])
-        image.source = Qt.binding(function() { return "image://aruco/" + currentMarkerId; })
     }
 
     Connections {
@@ -68,6 +56,32 @@ ApplicationWindow {
 
             Item {
                 id: generatorTab
+
+                property int templateIdx: 0
+                property int currentMarkerId: homographyTools.templateMarkerIds[templateIdx]
+
+                MarkerInfo {
+                    id: markerInfo
+                    marker_id: generatorTab.currentMarkerId
+                }
+
+                Component.onCompleted: {
+                    image.source = Qt.binding(function() { return "image://aruco/" + currentMarkerId; })
+                }
+
+                onTemplateIdxChanged: {
+                    if (homographyTools.templateMarkerIds.length > 0)
+                        currentMarkerId = homographyTools.templateMarkerIds[templateIdx]
+                }
+
+                Connections {
+                    target: homographyTools
+                    function onTemplateMarkerIdsChanged() {
+                        console.log("Template marker IDs changed, resetting templateIdx to 0")
+                        generatorTab.templateIdx = 0
+                    }
+                }
+
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 10
@@ -123,6 +137,105 @@ ApplicationWindow {
                             // property int bounded_smallest_dimension: smallest_dimension <= 1024 ? smallest_dimension : 1024
                             // sourceSize.width: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
                             // sourceSize.height: Math.floor(bounded_smallest_dimension / qrCodeInfo.size) * qrCodeInfo.size
+                        }
+
+                        MouseArea {
+                            id: hover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                            property bool showOverlay: hideOverlayTimer.running
+                            property int opacityDuration: 400
+                            onPositionChanged: hideOverlayTimer.restart()
+                            onExited: hideOverlayTimer.stop()
+
+                            Timer {
+                                id: hideOverlayTimer
+                                interval: 2000
+                                running: false
+                            }
+
+                            // Left arrow
+                            Rectangle {
+                                width: 50
+                                height: 100
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: "#80000000"
+                                radius: 5
+
+                                opacity: (hover.showOverlay && generatorTab.templateIdx > 0) ? 1.0 : 0.0
+                                Behavior on opacity {
+                                    NumberAnimation { duration: hover.opacityDuration }
+                                }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "<"
+                                    color: "white"
+                                    font.pixelSize: 40
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (generatorTab.templateIdx > 0) {
+                                            generatorTab.templateIdx--
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Right arrow
+                            Rectangle {
+                                width: 50
+                                height: 100
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: "#80000000"
+                                radius: 5
+
+                                opacity: (hover.showOverlay && homographyTools.templateMarkerIds.length > 0 && generatorTab.templateIdx < homographyTools.templateMarkerIds.length - 1) ? 1.0 : 0.0
+                                Behavior on opacity {
+                                    NumberAnimation { duration: hover.opacityDuration }
+                                }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: ">"
+                                    color: "white"
+                                    font.pixelSize: 40
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (generatorTab.templateIdx < homographyTools.templateMarkerIds.length - 1) {
+                                            generatorTab.templateIdx++
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: 80
+                                height: 30
+                                color: "#80000000"
+                                radius: 15
+                                opacity: hover.showOverlay ? 1.0 : 0.0
+                                Behavior on opacity {
+                                    NumberAnimation { duration: hover.opacityDuration }
+                                }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    color: "white"
+                                    text: (generatorTab.templateIdx + 1) + " / " + homographyTools.templateMarkerIds.length
+                                }
+                            }
                         }
                     }
 
@@ -222,7 +335,7 @@ ApplicationWindow {
                                 Layout.preferredWidth: 150
                                 onCurrentIndexChanged: {
                                     console.log("template changed: " + model[currentIndex])
-                                    window.currentMarkerId = homographyTools.getPreviewMarkerId(model[currentIndex])
+                                    homographyTools.template = model[currentIndex]
                                 }
                             }
                         }
