@@ -192,7 +192,7 @@ ApplicationWindow {
                                 Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
                                 horizontalAlignment: Qt.AlignHCenter
                                 readOnly: true
-                                text: markerInfo.on_modules
+                                text: markerInfo.off_modules
                             }
                         }
                         RowLayout {
@@ -205,7 +205,7 @@ ApplicationWindow {
                                 Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
                                 horizontalAlignment: Qt.AlignHCenter
                                 readOnly: true
-                                text: markerInfo.off_modules
+                                text: markerInfo.on_modules
                             }
                         }
                         Item {
