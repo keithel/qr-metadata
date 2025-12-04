@@ -1,0 +1,125 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Dialogs
+import io.qt.dev
+
+Item {
+    required property ArUcoHomography ht
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 10
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 50
+            color: "white"
+
+            Image {
+                id: previewImage
+                property bool showMarkerLabels: true
+                property real scaleFactor: {
+                    previewImage.status === Image.Ready ?
+                        Math.min(previewImage.width / previewImage.sourceSize.width,
+                                    previewImage.height / previewImage.sourceSize.height)
+                        : 0
+                }
+                property int xOffset: previewImage.x + (previewImage.width - previewImage.sourceSize.width * previewImage.scaleFactor) / 2
+                property int yOffset: previewImage.y + (previewImage.height - previewImage.sourceSize.height * previewImage.scaleFactor) / 2
+
+                source: ""
+                anchors.fill: parent
+                anchors.margins: 2
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                autoTransform: true
+
+                Repeater {
+                    id: markerIdLabelsRepeater
+                    model: ht.detections
+                    delegate: TextField {
+                        visible: previewImage.showMarkerLabels
+                        text: modelData.role == "N/A" ? modelData.id : modelData.role
+                        color: modelData.role == "N/A" ? "red" : "green"
+                        width: 30
+                        x: previewImage.xOffset + Math.min(modelData.tl[0], modelData.tr[0], modelData.br[0], modelData.bl[0]) * previewImage.scaleFactor + 4
+                        y: previewImage.yOffset + Math.min(modelData.tl[1], modelData.tr[1], modelData.br[1], modelData.bl[1]) * previewImage.scaleFactor - 20
+                        readOnly: true
+                        Layout.preferredWidth: 50
+                        horizontalAlignment: Qt.AlignHCenter
+                    }
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onPressed: parent.showMarkerLabels = false
+                    onReleased: parent.showMarkerLabels = true
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                text: "No Image Loaded"
+                visible: previewImage.status !== Image.Ready
+                color: "gray"
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Button {
+                text: "Load Image"
+                onClicked: fileDialog.open()
+            }
+
+            Label {
+                id: detectionResultLabel
+                text: ht.detections.length + " markers detected."
+                visible: previewImage.status === Image.Ready
+            }
+        }
+
+        ScrollView {
+            Layout.fillWidth: true
+            // Layout.fillHeight: true
+            contentWidth: availableWidth
+
+            ColumnLayout {
+                id: detectionResultsLayout
+                width: parent.width
+                spacing: 5
+
+                Repeater {
+                    id: detectionRepeater
+                    model: ht.detections
+                    delegate: RowLayout {
+                        width: parent.width
+                        TextField {
+                            text: modelData.id
+                            readOnly: true
+                            Layout.preferredWidth: 50
+                            horizontalAlignment: Qt.AlignHCenter
+                        }
+                        TextField {
+                            text: ("TL: " + modelData.tl +
+                                    " BR: " + modelData.br)
+                            readOnly: true
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    FileDialog {
+        id: fileDialog
+        title: "Select an Image"
+        nameFilters: ["Image files (*.png *.jpg *.jpeg *.bmp)"]
+        onAccepted: {
+            previewImage.source = selectedFile
+            ht.detectFromFile(selectedFile)
+        }
+    }
+}
