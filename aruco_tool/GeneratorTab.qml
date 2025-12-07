@@ -117,6 +117,7 @@ Item {
 
                     opacity: (hover.showOverlay && generatorTab.templateIdx > 0) ? 1.0 : 0.0
                     Behavior on opacity {
+                        enabled: hover.containsMouse
                         NumberAnimation { duration: hover.opacityDuration }
                     }
 
@@ -149,6 +150,7 @@ Item {
 
                     opacity: (hover.showOverlay && ht.templateMarkerIds.length > 0 && generatorTab.templateIdx < ht.templateMarkerIds.length - 1) ? 1.0 : 0.0
                     Behavior on opacity {
+                        enabled: hover.containsMouse
                         NumberAnimation { duration: hover.opacityDuration }
                     }
 
@@ -178,6 +180,7 @@ Item {
                     radius: 15
                     opacity: hover.showOverlay ? 1.0 : 0.0
                     Behavior on opacity {
+                        enabled: hover.containsMouse
                         NumberAnimation { duration: hover.opacityDuration }
                     }
 
