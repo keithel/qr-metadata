@@ -31,6 +31,9 @@ TEMPLATES = {
     }
 }
 
+CM_PER_INCH = 2.54
+INCH_PER_METER = 1 / (CM_PER_INCH/100)
+
 @QmlElement
 class ArUcoHomography(QObject):
     detectionsChanged = Signal()
@@ -258,6 +261,9 @@ class ArUcoHomography(QObject):
         # Use the template dimensions
         page_size_pixels = self._page_size.sizePixels(self._dpi)
         dest_img = QImage(page_size_pixels, QImage.Format.Format_ARGB32)
+        dpm = round(self._dpi * INCH_PER_METER)
+        dest_img.setDotsPerMeterX(dpm)
+        dest_img.setDotsPerMeterY(dpm)
         dest_img.fill(Qt.GlobalColor.white) # Paper background
 
         painter = QPainter(dest_img)
