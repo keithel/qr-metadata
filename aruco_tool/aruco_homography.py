@@ -1,7 +1,9 @@
 import os
 import cv2
+import numpy as np
 from PySide6.QtCore import QObject, Signal, Property, Slot, QUrl, QMarginsF
-from PySide6.QtGui import QPainter, QPdfWriter, QPageSize
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter, QPdfWriter, QPageSize, QTransform, QImage
 from PySide6.QtQml import QmlElement
 
 from .utils import ARUCO_DICT, BORDER_SIZE
@@ -34,12 +36,15 @@ class ArUcoHomography(QObject):
     detectionsChanged = Signal()
     templateChanged = Signal(str)
     templateMarkerIdsChanged = Signal()
+    transformChanged = Signal()
 
     def __init__(self):
         super().__init__()
         self._detections = []
+        self._current_qtransform = QTransform() # Identity by default
+
         # Default template is the first one in the TEMPLATES dict
-        current_template_name = TEMPLATES.keys().__iter__().__next__()
+        current_template_name = list(TEMPLATES.keys())[0]
 
         # Intilize geometry with default template
         self._dpi = 300  # Dots per inch for PDF generation
@@ -89,16 +94,40 @@ class ArUcoHomography(QObject):
             print(f"Found template: {found_template}")
             self._set_template(found_template)
 
+            # Init the point arrays we're converting from and to
+            src_points = []
+            dst_points = []
+
             for i, marker_id in enumerate(flat_ids):
                 valid_corners[marker_id] = corners[i][0]
 
             required_ids = TEMPLATES[found_template]["ids"]
 
-            for role_idx, marker_id in enumerate(required_ids):
-                c = valid_corners[marker_id]
-                roles = ["TL", "TR", "BL", "BR"]
-                role_name = roles[role_idx]
+            # Roles order matches TEMPLATES def of TL, TR, BL, BR
+            roles = ["TL", "TR", "BL", "BR"]
 
+            for role_idx, marker_id in enumerate(required_ids):
+                # Fill in the corner points for each detected marker - a 2d array of 4 points
+                # TL, TR, BR, BL (Clockwise)
+                c = valid_corners[marker_id]
+                src_points.extend(c)
+
+                # Fill in the destination corner points from the template markers - same layout
+                # - TL, TR, BR, BL using the top left coordinate + the size of the template image
+                # in dots.  Note: TL is the top left point of the ArUco marker.
+                tx, ty = self._template_marker_positions[role_idx]
+                ts = self._marker_image_dot_size
+
+                marker_dst = [
+                    [tx, ty],           # TL
+                    [tx + ts, ty],      # TR
+                    [tx + ts, ty + ts], # BR
+                    [tx, ty + ts]       # BL
+                ]
+                dst_points.extend(marker_dst)
+
+                # Put it into the property that QML is using.
+                role_name = roles[role_idx]
                 new_detections.append({
                     "id": int(marker_id),
                     "role": role_name,
@@ -108,12 +137,19 @@ class ArUcoHomography(QObject):
                     "bl": c[3].tolist(),
                     "positionStr": f"{role_name}: ({int(c[0][0])},{int(c[0][1])})"
                 })
+
+            # Use the source and destination points to calculate the QTransform.
+            self._calculate_homography(src_points, dst_points)
+
         else:
             print("Validation Failed: No matching template found.")
             self._current_template_name = ""
             self.templateChanged.emit("")
 
-            # Fallback: report all detected markers without roles
+            # Reset Transform
+            self._current_qtransform = QTransform()
+            self.transformChanged.emit()
+
             for i, marker_id in enumerate(flat_ids):
                 c = corners[i][0]
                 new_detections.append({
@@ -129,6 +165,38 @@ class ArUcoHomography(QObject):
         if new_detections != self._detections:
             self._detections = new_detections
             self.detectionsChanged.emit()
+
+    def _calculate_homography(self, src_list, dst_list):
+        if not src_list or len(src_list) < 4:
+            return
+
+        src_arr = np.array(src_list, dtype=np.float32)
+        dst_arr = np.array(dst_list, dtype=np.float32)
+
+        # Calculate homography: Maps image coordinates to template coordinates
+        h_matrix, status = cv2.findHomography(src_arr, dst_arr)
+
+        if h_matrix is not None:
+            # Flatten 3x3 matrix
+            h = h_matrix.flatten()
+
+            # Create QTransform
+            # QTransform(m11, m12, m13, m21, m22, m23, m31, m32, m33)
+            # Mapping:
+            # m11=h00, m12=h10, m13=h20
+            # m21=h01, m22=h11, m23=h21
+            # m31=h02, m32=h12, m33=h22
+
+            self._current_qtransform = QTransform(
+                h[0], h[3], h[6],
+                h[1], h[4], h[7],
+                h[2], h[5], h[8]
+            )
+            print("Homography calculated successfully.")
+            print(self._current_qtransform)
+            self.transformChanged.emit()
+        else:
+            print("Homography calculation failed.")
 
     @Slot(str, str)
     def generate_template_pdf(self, template_name: str, filename: str) -> None:
@@ -152,6 +220,68 @@ class ArUcoHomography(QObject):
         for img, pos in zip(images, self._template_marker_positions):
             painter.drawImage(pos[0], pos[1], img)
         painter.end()
+
+    @Slot(str, str, result=bool)
+    def save_sketch(self, source_file_url: str, output_path: str) -> bool:
+        """
+        Uses the calculated homography to warp the source image onto a flat page and saves the
+        result.
+
+        :param source_file_url: path to image to warp
+        :type source_file_url: str
+        :param output_path: path tp save the resultant warped image to.
+        :type output_path: str
+        :return: True if warped image was saved, false otherwise.
+        :rtype: bool
+        """
+        if self._current_qtransform.isIdentity():
+            print("No valid transform available.")
+            return False
+
+        source_path = QUrl(source_file_url).toLocalFile()
+        if not os.path.exists(source_path):
+            print(f"Source file not found: {source_path}")
+            return False
+
+        src_img = cv2.imread(source_path)
+        if src_img is None:
+            print(f"Failed to read source file: {source_path}")
+            return False
+
+        # Convert OpenCV (BGR) to QImage (RGB) for QPainter
+        src_img = cv2.cvtColor(src_img, cv2.COLOR_BGR2RGB)
+        h, w, ch = src_img.shape
+        bytes_per_line = ch * w
+
+        q_src_img = QImage(src_img.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+
+        # Use the template dimensions
+        page_size_pixels = self._page_size.sizePixels(self._dpi)
+        dest_img = QImage(page_size_pixels, QImage.Format.Format_ARGB32)
+        dest_img.fill(Qt.GlobalColor.white) # Paper background
+
+        painter = QPainter(dest_img)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        # Apply homography transform - mapping source coords to dest coords
+        painter.setTransform(self._current_qtransform)
+
+        # Draw the source image at the top left of dest image.
+        # The transform projects it onto the page.
+        painter.drawImage(0, 0, q_src_img)
+        painter.end()
+
+        # Save the transformed image
+        save_loc = QUrl(output_path).toLocalFile() if output_path.startswith("file:") else output_path
+        save_res = dest_img.save(save_loc)
+        if not save_res:
+            print(f"Failed to save {save_loc}, QImage.save failed.")
+        return save_res
+
+    @Slot(result=bool)
+    def transformIsIdentity(self):
+        return self._current_qtransform.isIdentity()
 
     def _set_template(self, template_name: str, emit_signal: bool = True) -> None:
         if template_name not in TEMPLATES:
@@ -198,7 +328,7 @@ class ArUcoHomography(QObject):
         return int(mm * self._dpi / 25.4)
 
     # Using QVariantList to pass list of dicts to QML
-    @Property('QVariantList', notify=detectionsChanged)
+    @Property(list, notify=detectionsChanged)
     def detections(self):
         return self._detections
 
@@ -220,3 +350,15 @@ class ArUcoHomography(QObject):
         if template_name in TEMPLATES:
             return [int(id) for id in TEMPLATES[template_name]["ids"]]
         return []
+
+    # If we want to draw something on the transformed image.
+    @Property(list, notify=transformChanged)
+    def homographyMatrix(self):
+        """Returns the QTransform values as a flat list [m11, m12, ... m33].
+           Useful for QML Matrix4x4 construction or debug."""
+        t = self._current_qtransform
+        return [
+            t.m11(), t.m12(), t.m13(),
+            t.m21(), t.m22(), t.m23(),
+            t.m31(), t.m32(), t.m33()
+        ]

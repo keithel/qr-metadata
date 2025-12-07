@@ -11,6 +11,24 @@ ApplicationWindow {
     height: 768
     title: qsTr("ArUco Manager")
 
+    readonly property var args: Qt.application.arguments
+    property var currentArgs: args.slice(1)
+
+    Component.onCompleted: {
+        print("currentArgs:", currentArgs)
+        if (currentArgs.length > 0) {
+            if (currentArgs[0] == "-g") {
+                generatorButton.click()
+                currentArgs.shift()
+            }
+            else if (currentArgs[0] == "-d") {
+                detectorButton.click()
+                currentArgs.shift()
+            }
+        }
+        print("currentArgs:", currentArgs)
+    }
+
     ArUcoHomography {
         id: homographyTools
     }
@@ -21,8 +39,8 @@ ApplicationWindow {
     header: TabBar {
         id: tabBar
         Layout.fillWidth: true
-        TabButton { text: "Generator" }
-        TabButton { text: "Detector" }
+        TabButton { id: generatorButton; text: "Generator" }
+        TabButton { id: detectorButton; text: "Detector" }
     }
 
     StackLayout {
