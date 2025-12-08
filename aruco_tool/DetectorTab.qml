@@ -72,11 +72,61 @@ Item {
                     }
                 }
                 TextField {
-                    property point imgMousePos: Qt.point(imgMouseArea.mouseX - previewImage.xOffset, imgMouseArea.mouseY - previewImage.yOffset)
+                    property real mouseX: (imgMouseArea.mouseX - previewImage.xOffset) / previewImage.scaleFactor
+                    property real mouseY: (imgMouseArea.mouseY - previewImage.yOffset) / previewImage.scaleFactor
+                    property bool mouseWithinMarker: withinMarker(mouseX, mouseY, ht.detections)
+                    color: mouseWithinMarker ? "green" : "red"
                     anchors.left: parent.left
                     anchors.top: parent.top
                     visible: imgMouseArea.containsMouse
-                    text: "(" + imgMousePos.x + ", " + imgMouseArea.mouseY + ")"
+                    text: "(" + mouseX.toFixed(1) + ", " + mouseY.toFixed(1) + ")"
+
+                    function crossProduct(x1, y1, x2, y2) {
+                        return x1 * y2 - x2 * y1
+                    }
+                    function insideMarker(x, y, marker) {
+                        const corners = [
+                            marker.tl, marker.tr,
+                            marker.br, marker.bl
+                        ]
+
+                        let sign = 0
+                        for (let i = 0; i < corners.length; i++) {
+                            const pA = corners[i]
+                            const pB = corners[(i+1) % corners.length]
+                            const edge_vx = pB[0] - pA[0]
+                            const edge_vy = pB[1] - pA[1]
+
+                            // test vector from pA to the test point (x,y)
+                            const test_vx = x - pA[0]
+                            const test_vy = y - pA[1]
+
+                            const cross = crossProduct(edge_vx, edge_vy, test_vx, test_vy)
+                            if (cross !== 0) {
+                                if (sign === 0) {
+                                    sign = cross > 0 ? 1 : -1
+                                }
+                                else if ((cross > 0 ? 1 : -1) !== sign) {
+                                    // If the sign changes, the point is outside the rectangle
+                                    return false
+                                }
+                            }
+                        }
+                        // Point is inside or on boundary
+                        return true
+                    }
+
+                    function withinMarker(x, y, detections) {
+                        if (!detections)
+                            return false
+
+                        for (const marker of detections) {
+                            if (insideMarker(x, y, marker)) {
+                                return true
+                            }
+                        }
+                        return false
+                    }
                 }
 
                 MouseArea {
