@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+from pathlib import Path
 from PySide6.QtCore import QObject, Signal, Property, Slot, QUrl, QMarginsF
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QPdfWriter, QPageSize, QTransform, QImage
@@ -292,6 +293,14 @@ class ArUcoHomography(QObject):
         save_res = dest_img.save(save_loc)
         if not save_res:
             print(f"Failed to save {save_loc}, QImage.save failed.")
+
+        output_pdf_path = Path(output_path).with_suffix(".pdf")
+        pdf_writer = self._setup_pdf_writer(str(output_pdf_path))
+        painter = QPainter(pdf_writer)
+        painter.setTransform(self._current_qtransform)
+        painter.drawImage(0, 0, q_src_img)
+        painter.end()
+
         return save_res
 
     @Slot(result=bool)
