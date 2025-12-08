@@ -121,11 +121,20 @@ class ArUcoHomography(QObject):
                 tx, ty = self._template_marker_positions[role_idx]
                 ts = self._marker_image_dot_size
 
+                num_modules = 6
+                module_size = ts // num_modules
+                # Size of the actual marker not including white padding
+                marker_dim = module_size * num_modules
+                padding = (ts-marker_dim) // 2
+
+                mtx = tx + padding
+                mty = ty + padding
+
                 marker_dst = [
-                    [tx, ty],           # TL
-                    [tx + ts, ty],      # TR
-                    [tx + ts, ty + ts], # BR
-                    [tx, ty + ts]       # BL
+                    [mtx, mty],                           # TL
+                    [mtx + marker_dim, mty],              # TR
+                    [mtx + marker_dim, mty + marker_dim], # BR
+                    [mtx, mty + marker_dim]               # BL
                 ]
                 dst_points.extend(marker_dst)
 
