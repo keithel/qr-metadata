@@ -193,12 +193,10 @@ Item {
             }
         }
 
-        FlexboxLayout {
+        Flow {
             id: metadataLayout
-            Layout.maximumHeight: implicitHeight
-            direction: FlexboxLayout.Row
-            wrap: FlexboxLayout.Wrap
-            property int textFieldPreferredWidth: 50
+            property int textFieldPreferredWidth: 30
+            Layout.fillWidth: true
 
             RowLayout {
                 Label {
@@ -212,6 +210,8 @@ Item {
                     readOnly: true
                     text: templateComboBox.currentText
                 }
+            }
+            RowLayout {
                 Label {
                     id: markerIdLabel
                     text: "ID"
@@ -223,6 +223,8 @@ Item {
                     readOnly: true
                     text: markerInfo.marker_id
                 }
+            }
+            RowLayout {
                 Label {
                     id: markerSizeLabel
                     text: "Marker Size"
@@ -230,12 +232,12 @@ Item {
                 TextField {
                     id: markerSizeText
                     Layout.preferredWidth: metadataLayout.textFieldPreferredWidth
-                    width: metadataLayout.textFieldPreferredWidth
                     horizontalAlignment: Qt.AlignHCenter
                     readOnly: true
                     text: markerInfo.marker_size
                 }
             }
+
             RowLayout {
                 Label {
                     verticalAlignment: Qt.AlignVCenter
@@ -249,6 +251,7 @@ Item {
                     text: markerInfo.border_size
                 }
             }
+
             RowLayout {
                 Label {
                     verticalAlignment: Qt.AlignVCenter
@@ -262,6 +265,7 @@ Item {
                     text: markerInfo.off_modules
                 }
             }
+
             RowLayout {
                 Label {
                     verticalAlignment: Qt.AlignVCenter
@@ -275,9 +279,11 @@ Item {
                     text: markerInfo.on_modules
                 }
             }
-            Item {
-                Layout.fillWidth: true
-            }
+        }
+        Flow {
+            id: controlsLayout
+            Layout.fillWidth: true
+
             RowLayout {
                 Label {
                     verticalAlignment: Qt.AlignVCenter
@@ -293,6 +299,7 @@ Item {
                     }
                 }
             }
+
             CheckBox {
                 id: randomizedTransformCheckbox
                 text: "Apply Random Transformation"
