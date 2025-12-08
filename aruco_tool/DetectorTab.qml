@@ -71,8 +71,18 @@ Item {
                         horizontalAlignment: Qt.AlignHCenter
                     }
                 }
+                TextField {
+                    property point imgMousePos: Qt.point(imgMouseArea.mouseX - previewImage.xOffset, imgMouseArea.mouseY - previewImage.yOffset)
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    visible: imgMouseArea.containsMouse
+                    text: "(" + imgMousePos.x + ", " + imgMouseArea.mouseY + ")"
+                }
+
                 MouseArea {
+                    id: imgMouseArea
                     anchors.fill: parent
+                    hoverEnabled: true
                     onReleased: {
                         if (parent.sketchSource != "")
                             parent.showSketch = !parent.showSketch
