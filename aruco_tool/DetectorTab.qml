@@ -48,7 +48,7 @@ Item {
 
                 source: showSketch ? sketchSource : inputImgSource
                 anchors.fill: parent
-                anchors.margins: 2
+                // anchors.margins: 20
                 fillMode: Image.PreserveAspectFit
                 smooth: false
                 autoTransform: true
